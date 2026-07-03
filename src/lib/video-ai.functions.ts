@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { chatCompletion } from "./ai-gateway.server";
+import { chatCompletion, getLovableApiKey } from "./ai-gateway.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getLovableApiKey } from "./ai-gateway.server";
 
 const GenerateScriptInput = z.object({
   topic: z.string().min(3).max(500),
