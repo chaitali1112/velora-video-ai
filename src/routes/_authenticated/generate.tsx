@@ -446,9 +446,11 @@ function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: 
   );
 }
 
-function SceneCard({ scene, index, aspect, onGenImage, onGenAudio }: {
-  scene: Scene; index: number; aspect: string; onGenImage: () => void; onGenAudio: () => void;
+function SceneCard({ scene, index, aspect, onGenImage, onGenAudio, onUploadImage }: {
+  scene: Scene; index: number; aspect: string;
+  onGenImage: () => void; onGenAudio: () => void; onUploadImage: (file: File) => void;
 }) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="border border-border/60 rounded-xl p-4 hover:border-violet/40 transition">
       <div className="flex items-center justify-between mb-3">
@@ -458,6 +460,20 @@ function SceneCard({ scene, index, aspect, onGenImage, onGenAudio }: {
             {scene.imageLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
             {scene.imageUrl ? "Regenerate" : "Image"}
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()} disabled={scene.imageLoading}>
+            <Upload className="h-3 w-3" /> Upload
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUploadImage(f);
+              e.target.value = "";
+            }}
+          />
           <Button variant="ghost" size="sm" onClick={onGenAudio} disabled={scene.audioLoading}>
             {scene.audioLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Volume2 className="h-3 w-3" />}
             {scene.audioUrl ? "Redo voice" : "Voice"}
