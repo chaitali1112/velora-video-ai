@@ -341,20 +341,37 @@ function GeneratePage() {
                 </div>
               </div>
 
-              {playing && (
-                <SlideshowStage scene={scenes[playIndex]} index={playIndex} total={scenes.length} aspect={aspect} />
-              )}
+              <AnimatePresence mode="wait">
+                {playing && (
+                  <motion.div
+                    key={`stage-${playIndex}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <SlideshowStage scene={scenes[playIndex]} index={playIndex} total={scenes.length} aspect={aspect} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="space-y-3">
                 {scenes.map((s, i) => (
-                  <SceneCard
+                  <motion.div
                     key={i}
-                    scene={s}
-                    index={i}
-                    aspect={aspect}
-                    onGenImage={() => genImage(i)}
-                    onGenAudio={() => genAudio(i)}
-                  />
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -2 }}
+                  >
+                    <SceneCard
+                      scene={s}
+                      index={i}
+                      aspect={aspect}
+                      onGenImage={() => genImage(i)}
+                      onGenAudio={() => genAudio(i)}
+                    />
+                  </motion.div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-6 text-center">
