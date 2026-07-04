@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { generateScript, generateScenes, generateSceneAudio, saveProject } from "@/lib/video-ai.functions";
 import { streamImage } from "@/lib/streamImage";
 import { toast } from "sonner";
-import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save } from "lucide-react";
+import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/generate")({
   head: () => ({ meta: [{ title: "New Project — Velora" }] }),
@@ -131,6 +131,24 @@ function GeneratePage() {
     }
     updateScene(i, { audioLoading: false });
     toast.error(`Scene ${i + 1} voice: ${(lastErr as Error)?.message ?? "failed"}`);
+  }
+
+  function uploadImage(i: number, file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image must be under 8MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateScene(i, { imageUrl: reader.result as string, imageLoading: false });
+      toast.success(`Scene ${i + 1} image uploaded`);
+    };
+    reader.onerror = () => toast.error("Failed to read image");
+    reader.readAsDataURL(file);
   }
 
   async function genAllAssets() {
@@ -370,6 +388,7 @@ function GeneratePage() {
                       aspect={aspect}
                       onGenImage={() => genImage(i)}
                       onGenAudio={() => genAudio(i)}
+                      onUploadImage={(file) => uploadImage(i, file)}
                     />
                   </motion.div>
                 ))}
