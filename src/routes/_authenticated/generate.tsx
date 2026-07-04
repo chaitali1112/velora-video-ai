@@ -86,40 +86,61 @@ function GeneratePage() {
   async function genImage(i: number) {
     if (!scenes) return;
     updateScene(i, { imageLoading: true, imageUrl: undefined });
-    try {
-      await streamImage(
-        "/api/generate-scene-image",
-        { prompt: scenes[i].visual, aspect },
-        (dataUrl, isFinal) => {
-          updateScene(i, { imageUrl: dataUrl, imageLoading: !isFinal });
-        },
-      );
-    } catch (e) {
-      updateScene(i, { imageLoading: false });
-      toast.error((e as Error).message);
+    const prompt = scenes[i].visual;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await streamImage(
+          "/api/generate-scene-image",
+          { prompt, aspect },
+          (dataUrl, isFinal) => {
+            updateScene(i, { imageUrl: dataUrl, imageLoading: !isFinal });
+          },
+        );
+        return;
+      } catch (e) {
+        lastErr = e;
+        const msg = (e as Error).message || "";
+        const retriable = /429|rate|timeout|network|fetch|5\d\d/i.test(msg);
+        if (!retriable) break;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
     }
+    updateScene(i, { imageLoading: false });
+    toast.error(`Scene ${i + 1} image: ${(lastErr as Error)?.message ?? "failed"}`);
   }
 
   async function genAudio(i: number) {
     if (!scenes) return;
     updateScene(i, { audioLoading: true, audioUrl: undefined });
-    try {
-      const r = (await audioFn({ data: { text: scenes[i].narration, voice } })) as { audio: string };
-      updateScene(i, { audioUrl: r.audio, audioLoading: false });
-    } catch (e) {
-      updateScene(i, { audioLoading: false });
-      toast.error((e as Error).message);
+    const text = scenes[i].narration;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = (await audioFn({ data: { text, voice } })) as { audio: string };
+        updateScene(i, { audioUrl: r.audio, audioLoading: false });
+        return;
+      } catch (e) {
+        lastErr = e;
+        const msg = (e as Error).message || "";
+        const retriable = /429|rate|timeout|network|fetch|5\d\d/i.test(msg);
+        if (!retriable) break;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
     }
+    updateScene(i, { audioLoading: false });
+    toast.error(`Scene ${i + 1} voice: ${(lastErr as Error)?.message ?? "failed"}`);
   }
 
   async function genAllAssets() {
     if (!scenes) return;
     toast.info("Generating images & voiceover for all scenes…");
     for (let i = 0; i < scenes.length; i++) {
-      await Promise.all([
-        !scenes[i].imageUrl ? genImage(i) : Promise.resolve(),
-        !scenes[i].audioUrl ? genAudio(i) : Promise.resolve(),
-      ]);
+      // Serialise image then audio per scene to avoid tripping per-workspace rate limits.
+      if (!scenes[i].imageUrl) await genImage(i);
+      if (!scenes[i].audioUrl) await genAudio(i);
+      // Small breather between scenes.
+      await new Promise((r) => setTimeout(r, 400));
     }
     toast.success("All assets ready");
   }
