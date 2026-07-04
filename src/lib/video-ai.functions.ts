@@ -86,21 +86,30 @@ export const generateSceneAudio = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => GenerateAudioInput.parse(i))
   .handler(async ({ data }) => {
     const key = getLovableApiKey();
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini-tts",
-        input: data.text,
-        voice: data.voice,
-        response_format: "mp3",
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
+    let res: Response | undefined;
+    let lastErrText = "";
+    for (let attempt = 0; attempt < 4; attempt++) {
+      res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini-tts",
+          input: data.text,
+          voice: data.voice,
+          response_format: "mp3",
+        }),
+      });
+      if (res.ok) break;
+      lastErrText = await res.text().catch(() => "");
       if (res.status === 402) throw new Error("Out of AI credits. Please top up in workspace billing.");
-      if (res.status === 429) throw new Error("Rate limited. Please retry shortly.");
-      throw new Error(`TTS error [${res.status}]: ${t}`);
+      if (res.status !== 429 && res.status < 500) {
+        throw new Error(`TTS error [${res.status}]: ${lastErrText}`);
+      }
+      // Backoff for 429/5xx: 1s, 2.5s, 5s
+      await new Promise((r) => setTimeout(r, 1000 + attempt * 1500));
+    }
+    if (!res || !res.ok) {
+      throw new Error(`Rate limited after retries. Please wait a moment and retry. ${lastErrText}`.trim());
     }
     const buf = new Uint8Array(await res.arrayBuffer());
     let binary = "";
