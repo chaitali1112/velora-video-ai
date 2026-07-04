@@ -409,6 +409,14 @@ function aspectRatio(a: string) {
 }
 
 function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: number; total: number; aspect: string }) {
+  const variants = [
+    { initial: { opacity: 0, scale: 1.08 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 1.02 } },
+    { initial: { opacity: 0, x: 80 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -80 } },
+    { initial: { opacity: 0, x: -80 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: 80 } },
+    { initial: { opacity: 0, y: 60, scale: 1.04 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -40 } },
+    { initial: { opacity: 0, rotate: -2, scale: 1.1 }, animate: { opacity: 1, rotate: 0, scale: 1 }, exit: { opacity: 0, scale: 0.98 } },
+  ];
+  const v = variants[index % variants.length];
   return (
     <div className="mb-6 rounded-2xl overflow-hidden border border-violet/40 bg-black relative" style={{ aspectRatio: aspectRatio(aspect) }}>
       <AnimatePresence mode="wait">
@@ -418,10 +426,10 @@ function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: 
             src={scene.imageUrl}
             alt={scene.visual}
             className="absolute inset-0 w-full h-full object-cover"
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ opacity: { duration: 0.6 }, scale: { duration: 6, ease: "linear" } }}
+            initial={v.initial}
+            animate={v.animate}
+            exit={v.exit}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], scale: { duration: 6, ease: "linear" } }}
           />
         ) : (
         <div className="absolute inset-0 grid place-items-center text-muted-foreground text-sm">
