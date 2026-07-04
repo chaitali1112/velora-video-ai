@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { generateScript, generateScenes, generateSceneAudio, saveProject } from "@/lib/video-ai.functions";
 import { streamImage } from "@/lib/streamImage";
 import { toast } from "sonner";
-import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save } from "lucide-react";
+import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/generate")({
   head: () => ({ meta: [{ title: "New Project — Velora" }] }),
@@ -131,6 +131,24 @@ function GeneratePage() {
     }
     updateScene(i, { audioLoading: false });
     toast.error(`Scene ${i + 1} voice: ${(lastErr as Error)?.message ?? "failed"}`);
+  }
+
+  function uploadImage(i: number, file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image must be under 8MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateScene(i, { imageUrl: reader.result as string, imageLoading: false });
+      toast.success(`Scene ${i + 1} image uploaded`);
+    };
+    reader.onerror = () => toast.error("Failed to read image");
+    reader.readAsDataURL(file);
   }
 
   async function genAllAssets() {
@@ -370,6 +388,7 @@ function GeneratePage() {
                       aspect={aspect}
                       onGenImage={() => genImage(i)}
                       onGenAudio={() => genAudio(i)}
+                      onUploadImage={(file) => uploadImage(i, file)}
                     />
                   </motion.div>
                 ))}
@@ -390,6 +409,14 @@ function aspectRatio(a: string) {
 }
 
 function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: number; total: number; aspect: string }) {
+  const variants = [
+    { initial: { opacity: 0, scale: 1.08 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 1.02 } },
+    { initial: { opacity: 0, x: 80 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -80 } },
+    { initial: { opacity: 0, x: -80 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: 80 } },
+    { initial: { opacity: 0, y: 60, scale: 1.04 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -40 } },
+    { initial: { opacity: 0, rotate: -2, scale: 1.1 }, animate: { opacity: 1, rotate: 0, scale: 1 }, exit: { opacity: 0, scale: 0.98 } },
+  ];
+  const v = variants[index % variants.length];
   return (
     <div className="mb-6 rounded-2xl overflow-hidden border border-violet/40 bg-black relative" style={{ aspectRatio: aspectRatio(aspect) }}>
       <AnimatePresence mode="wait">
@@ -399,10 +426,10 @@ function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: 
             src={scene.imageUrl}
             alt={scene.visual}
             className="absolute inset-0 w-full h-full object-cover"
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ opacity: { duration: 0.6 }, scale: { duration: 6, ease: "linear" } }}
+            initial={v.initial}
+            animate={v.animate}
+            exit={v.exit}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], scale: { duration: 6, ease: "linear" } }}
           />
         ) : (
         <div className="absolute inset-0 grid place-items-center text-muted-foreground text-sm">
@@ -427,9 +454,11 @@ function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: 
   );
 }
 
-function SceneCard({ scene, index, aspect, onGenImage, onGenAudio }: {
-  scene: Scene; index: number; aspect: string; onGenImage: () => void; onGenAudio: () => void;
+function SceneCard({ scene, index, aspect, onGenImage, onGenAudio, onUploadImage }: {
+  scene: Scene; index: number; aspect: string;
+  onGenImage: () => void; onGenAudio: () => void; onUploadImage: (file: File) => void;
 }) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="border border-border/60 rounded-xl p-4 hover:border-violet/40 transition">
       <div className="flex items-center justify-between mb-3">
@@ -439,6 +468,20 @@ function SceneCard({ scene, index, aspect, onGenImage, onGenAudio }: {
             {scene.imageLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
             {scene.imageUrl ? "Regenerate" : "Image"}
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()} disabled={scene.imageLoading}>
+            <Upload className="h-3 w-3" /> Upload
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUploadImage(f);
+              e.target.value = "";
+            }}
+          />
           <Button variant="ghost" size="sm" onClick={onGenAudio} disabled={scene.audioLoading}>
             {scene.audioLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Volume2 className="h-3 w-3" />}
             {scene.audioUrl ? "Redo voice" : "Voice"}
