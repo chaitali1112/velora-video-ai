@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { generateScript, generateScenes, generateSceneAudio, saveProject } from "@/lib/video-ai.functions";
 import { streamImage } from "@/lib/streamImage";
@@ -340,20 +341,37 @@ function GeneratePage() {
                 </div>
               </div>
 
-              {playing && (
-                <SlideshowStage scene={scenes[playIndex]} index={playIndex} total={scenes.length} aspect={aspect} />
-              )}
+              <AnimatePresence mode="wait">
+                {playing && (
+                  <motion.div
+                    key={`stage-${playIndex}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <SlideshowStage scene={scenes[playIndex]} index={playIndex} total={scenes.length} aspect={aspect} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="space-y-3">
                 {scenes.map((s, i) => (
-                  <SceneCard
+                  <motion.div
                     key={i}
-                    scene={s}
-                    index={i}
-                    aspect={aspect}
-                    onGenImage={() => genImage(i)}
-                    onGenAudio={() => genAudio(i)}
-                  />
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -2 }}
+                  >
+                    <SceneCard
+                      scene={s}
+                      index={i}
+                      aspect={aspect}
+                      onGenImage={() => genImage(i)}
+                      onGenAudio={() => genAudio(i)}
+                    />
+                  </motion.div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-6 text-center">
@@ -374,20 +392,37 @@ function aspectRatio(a: string) {
 function SlideshowStage({ scene, index, total, aspect }: { scene: Scene; index: number; total: number; aspect: string }) {
   return (
     <div className="mb-6 rounded-2xl overflow-hidden border border-violet/40 bg-black relative" style={{ aspectRatio: aspectRatio(aspect) }}>
-      {scene.imageUrl ? (
-        <img src={scene.imageUrl} alt={scene.visual} className="absolute inset-0 w-full h-full object-cover animate-in fade-in duration-700" />
-      ) : (
+      <AnimatePresence mode="wait">
+        {scene.imageUrl ? (
+          <motion.img
+            key={scene.imageUrl}
+            src={scene.imageUrl}
+            alt={scene.visual}
+            className="absolute inset-0 w-full h-full object-cover"
+            initial={{ opacity: 0, scale: 1.08 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ opacity: { duration: 0.6 }, scale: { duration: 6, ease: "linear" } }}
+          />
+        ) : (
         <div className="absolute inset-0 grid place-items-center text-muted-foreground text-sm">
           <div className="text-center">
             <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
             No image yet for this scene
           </div>
         </div>
-      )}
-      <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/90 to-transparent">
+        )}
+      </AnimatePresence>
+      <motion.div
+        key={`caption-${index}`}
+        initial={{ y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/90 to-transparent"
+      >
         <div className="text-[10px] uppercase tracking-widest text-cyan mb-1">Scene {index + 1} / {total}</div>
         <p className="text-white text-base sm:text-lg leading-snug drop-shadow-lg line-clamp-3">{scene.narration}</p>
-      </div>
+      </motion.div>
     </div>
   );
 }
