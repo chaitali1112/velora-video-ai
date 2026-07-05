@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { generateScript, generateScenes, generateSceneAudio, saveProject } from "@/lib/video-ai.functions";
 import { streamImage } from "@/lib/streamImage";
 import { toast } from "sonner";
-import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save, Upload } from "lucide-react";
+import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save, Upload, Download, Mic } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/generate")({
   head: () => ({ meta: [{ title: "New Project — Velora" }] }),
@@ -133,6 +133,38 @@ function GeneratePage() {
     toast.error(`Scene ${i + 1} voice: ${(lastErr as Error)?.message ?? "failed"}`);
   }
 
+  async function revoiceAll() {
+    if (!scenes) return;
+    toast.info(`Re-recording all voiceovers with ${voice}…`);
+    for (let i = 0; i < scenes.length; i++) {
+      await genAudio(i);
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    toast.success("Voiceover updated");
+  }
+
+  function downloadProject() {
+    if (!script) { toast.error("Nothing to download yet"); return; }
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      title: script.title || topic.slice(0, 80),
+      topic, length, language, style, voice, aspect,
+      script,
+      scenes: scenes ?? [],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safe = (payload.title || "velora-video").replace(/[^\w\-]+/g, "_").slice(0, 60);
+    a.href = url;
+    a.download = `${safe}.velora.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function uploadImage(i: number, file: File) {
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file");
@@ -212,7 +244,11 @@ function GeneratePage() {
       }) as { id: string };
       return r;
     },
-    onSuccess: (r) => { setProjectId(r.id); toast.success("Project saved"); },
+    onSuccess: (r) => {
+      setProjectId(r.id);
+      toast.success("Saved to My Videos");
+      downloadProject();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -343,6 +379,9 @@ function GeneratePage() {
                   <Button variant="glass" size="sm" onClick={genAllAssets}>
                     <Sparkles className="h-3.5 w-3.5" /> Generate all
                   </Button>
+                  <Button variant="glass" size="sm" onClick={revoiceAll} disabled={scenes.some((s) => s.audioLoading)}>
+                    <Mic className="h-3.5 w-3.5" /> Re-voice all
+                  </Button>
                   {playing ? (
                     <Button variant="glass" size="sm" onClick={stopPlayback}>
                       <Pause className="h-3.5 w-3.5" /> Stop
@@ -352,6 +391,9 @@ function GeneratePage() {
                       <Play className="h-3.5 w-3.5" /> Play slideshow
                     </Button>
                   )}
+                  <Button variant="glass" size="sm" onClick={downloadProject}>
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </Button>
                   <Button variant="glass" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                     {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     {projectId ? "Update" : "Save"}
