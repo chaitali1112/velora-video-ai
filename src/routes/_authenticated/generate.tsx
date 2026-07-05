@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { generateScript, generateScenes, generateSceneAudio, saveProject } from "@/lib/video-ai.functions";
 import { streamImage } from "@/lib/streamImage";
+import { renderSlideshowToWebM } from "@/lib/renderVideo";
 import { toast } from "sonner";
 import { Wand2, Loader2, Sparkles, Film, Play, RefreshCw, Image as ImageIcon, Volume2, Pause, Save, Upload, Download, Mic } from "lucide-react";
 
@@ -143,26 +144,33 @@ function GeneratePage() {
     toast.success("Voiceover updated");
   }
 
-  function downloadProject() {
-    if (!script) { toast.error("Nothing to download yet"); return; }
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      title: script.title || topic.slice(0, 80),
-      topic, length, language, style, voice, aspect,
-      script,
-      scenes: scenes ?? [],
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const safe = (payload.title || "velora-video").replace(/[^\w\-]+/g, "_").slice(0, 60);
-    a.href = url;
-    a.download = `${safe}.velora.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const [rendering, setRendering] = useState(false);
+  async function downloadVideo() {
+    if (!scenes || scenes.length === 0) { toast.error("Build scenes first"); return; }
+    if (!scenes.some((s) => s.imageUrl)) { toast.error("Generate images first"); return; }
+    setRendering(true);
+    const tid = toast.loading("Rendering video…");
+    try {
+      const blob = await renderSlideshowToWebM(
+        scenes.map(({ imageUrl, audioUrl, narration }) => ({ imageUrl, audioUrl, narration })),
+        aspect,
+        (msg) => toast.loading(msg, { id: tid }),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = ((script?.title || topic || "velora-video").replace(/[^\w\-]+/g, "_")).slice(0, 60);
+      a.href = url;
+      a.download = `${safe}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("Video downloaded", { id: tid });
+    } catch (e) {
+      toast.error(`Render failed: ${(e as Error).message}`, { id: tid });
+    } finally {
+      setRendering(false);
+    }
   }
 
   function uploadImage(i: number, file: File) {
@@ -247,7 +255,7 @@ function GeneratePage() {
     onSuccess: (r) => {
       setProjectId(r.id);
       toast.success("Saved to My Videos");
-      downloadProject();
+      void downloadVideo();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -391,8 +399,9 @@ function GeneratePage() {
                       <Play className="h-3.5 w-3.5" /> Play slideshow
                     </Button>
                   )}
-                  <Button variant="glass" size="sm" onClick={downloadProject}>
-                    <Download className="h-3.5 w-3.5" /> Download
+                  <Button variant="glass" size="sm" onClick={downloadVideo} disabled={rendering}>
+                    {rendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    Download video
                   </Button>
                   <Button variant="glass" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                     {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
